@@ -458,49 +458,44 @@ function createMessage(username, datetime, code, language, isMine, id, index, ic
 
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const urls = code?.match(urlRegex);
-    const firstUrl = urls
-      ? urls?.includes("youtube")
-        ? convertToYouTubeEmbedUrl(urls[0])
-        : urls[0]
-      : null;
-    let isYoutube = urls && urls[0]?.includes("youtube") ? true : false;
+    const firstUrl = urls ? urls[0] : null;
     const messageHTML = `
-  <div class="w-full items-start flex ${alignmentClass} my-1 mb-3">
-            <div class=" ${colorFamily} glass-effect rounded-2xl p-2 w-[90%] sm:w-[90%] md:w-[80%] lg:w-[50%] xl:w-[45%] 2xl:w-[45%]  border border-gray-200 hover:neon-border transition-all duration-300">
-                <div class="flex flex-row md:flex-row gap-2 justify-between items-center md:items-center md:gap-4 mb-2">
-                    <div class="flex items-center gap-2">
-                        <span class="text-md font-bold">${username}</span>
-                    </div>
-                    <div class="flex  items-center justify-between w-[100%]">
-                        <span class="text-gray-400 text-xs">${formattedDate}</span>
-                        <div class="flex gap-2 items-center justify-center">
+      <div class="w-full items-start flex ${alignmentClass} my-1 mb-3">
+        <div class=" ${colorFamily} glass-effect rounded-2xl p-2 w-[90%] sm:w-[90%] md:w-[80%] lg:w-[50%] xl:w-[45%] 2xl:w-[45%]  border border-gray-200 hover:neon-border transition-all duration-300">
+          <div class="flex flex-row md:flex-row gap-2 justify-between items-center md:items-center md:gap-4 mb-2">
+            <div class="flex items-center gap-2">
+              <span class="text-md font-bold">${username}</span>
+            </div>
+            <div class="flex  items-center justify-between w-[100%]">
+              <span class="text-gray-400 text-xs">${formattedDate}</span>
+              <div class="flex gap-2 items-center justify-center">
 
 
-                         <span class="px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-900 text-xxs">${language}</span>
-                          <div class="p-0.5 rounded-lg text-xs  hover-neon text-indigo-900 flex items-center justify-center transition-all duration-300 ">
-                          <img src=${icon} class="w-5 h-5 m-1"/>
-                         </div>
-
-                        <button
-                          class="p-2 copy-btn rounded-lg text-xs  hover-neon transition-all duration-300 bg-gray-200"
-                          id="copyLink"
-                          data-code="${index}"
-                        >
-                          <i class="fas fa-copy"></i>
-                        </button>
+                <span class="px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-900 text-xxs">${language}</span>
+                <div class="p-0.5 rounded-lg text-xs  hover-neon text-indigo-900 flex items-center justify-center transition-all duration-300 ">
+                  <img src=${icon} class="w-5 h-5 m-1"/>
                 </div>
 
+                <button
+                class="p-2 copy-btn rounded-lg text-xs  hover-neon transition-all duration-300 bg-gray-200"
+                id="copyLink"
+                data-code="${index}"
+                >
+                  <i class="fas fa-copy"></i>
+                </button>
+              </div>
+
             </div>
-            </div>
+          </div>
           <div id="${id}" class="code-editor-container" style="overflow: auto; border-radius: 10px; max-height: 20vh; width:100%"></div>
-        ${
-          language === "plaintext" && firstUrl && isYoutube
-            ? `<iframe src="${firstUrl}" class="w-full mt-2 border rounded-lg shadow-md" style="height: 20vh;"></iframe>`
+          ${
+            language === "plaintext" && firstUrl
+            ? `<div id="url-preview-${id}" class="w-full mt-2 border rounded-lg shadow-md" ></div>`
             : ""
-        }
-            </div>
-            </div>
-        `;
+          }
+        </div>
+      </div>
+    `;
 
     const messagesContainer = document.getElementById("messages");
     if (messagesContainer.querySelector(".text-center")) {
@@ -560,8 +555,42 @@ function createMessage(username, datetime, code, language, isMine, id, index, ic
         document.body.removeChild(tempInput);
         showToast("Code copied to clipboard!");
       });
+
+    // Fetch and display Open Graph metadata if URL exists
+    if (firstUrl) {
+      fetchMetadata(firstUrl, id);
+    }
   });
 }
+
+// Fetch Open Graph Metadata
+async function fetchMetadata(url, messageId) {
+  try {
+    const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+    const data = await response.json();
+    const doc = new DOMParser().parseFromString(data.contents, 'text/html');
+
+    // Extract Open Graph metadata
+    const title = doc.querySelector('meta[property="og:title"]')?.content || 'No title available';
+    const description = doc.querySelector('meta[property="og:description"]')?.content || 'No description available';
+    const image = doc.querySelector('meta[property="og:image"]')?.content || '';
+
+    // Generate preview card
+    const previewHTML = `
+      <a href="${url}" target="_blank" class="block rounded-lg transition-all p-1">
+        ${image ? `<img src="${image}" alt="Preview Image" class="w-full h-40 object-cover rounded-lg mb-2">` : ""}
+        <h3 class="text-sm font-bold">${title}</h3>
+        <p class="text-gray-500 text-xs">${description}</p>
+      </a>
+    `;
+
+    document.getElementById(`url-preview-${messageId}`).innerHTML = previewHTML;
+  } catch (error) {
+    console.error('Error fetching metadata:', error);
+    // document.getElementById(`url-preview-${messageId}`).innerHTML = `<a href="${url}" target="_blank" class="text-blue-500 underline">Open Link</a>`;
+  }
+}
+
 // for preview convert youtube url to embedded
 function convertToYouTubeEmbedUrl(url) {
   const regex =
